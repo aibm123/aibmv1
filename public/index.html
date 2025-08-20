@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIBM Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f0f2f5; }
+        .kpi-card { transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; }
+        .kpi-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .chart-container { min-height: 350px; }
+        .loader { border-top-color: #ffffff; animation: spin 1s linear infinite; }
+        .ai-loader { border-top-color: #4f46e5; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .sidebar-btn.active { background-color: #e0e7ff; color: #3730a3; font-weight: 600; }
+        .sidebar-btn { transition: all 0.2s ease; }
+        .sidebar-btn:hover { background-color: #eef2ff; color: #4338ca; }
+        .view-container { display: none; }
+        .view-container.active { display: block; }
+        .modal-overlay { transition: opacity 0.3s ease; }
+        .modal-container { transition: transform 0.3s ease, opacity 0.3s ease; }
+        .confirmation-popup { transition: opacity 0.5s ease, transform 0.5s ease; }
+        .sortable-header { cursor: pointer; user-select: none; }
+        .sortable-header:hover { background-color: #f1f5f9; }
+        .sort-icon { opacity: 0.5; transition: opacity 0.2s ease; }
+        .sortable-header.sorted .sort-icon { opacity: 1; }
+        .chat-bubble-user { background-color: #3b82f6; color: white; }
+        .chat-bubble-ai { background-color: #e5e7eb; color: #1f2937; }
+        
+        /* Styles for new modules */
+        .kanban-column { min-width: 300px; }
+        .task-card { cursor: grab; }
+        .task-card:active { cursor: grabbing; }
+        .diagram-placeholder { border: 2px dashed #cbd5e1; background-color: #f8fafc; text-align: center; padding: 2rem; }
+        .planner-tab-btn.active { border-color: #4f46e5; background-color: #eef2ff; color: #4f46e5; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- Authentication View -->
+    <div id="auth-view" class="flex items-center justify-center min-h-screen bg-slate-100">
+        <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+            <div>
+                <h2 id="auth-title" class="text-2xl font-bold text-center text-slate-900">Đăng nhập</h2>
+                <p class="mt-2 text-sm text-center text-slate-600">
+                    Hoặc <button id="auth-toggle-btn" class="font-medium text-indigo-600 hover:text-indigo-500">tạo một tài khoản mới</button>
+                </p>
+            </div>
+            <form id="auth-form" class="space-y-6">
+                <div id="register-name-field" class="hidden">
+                    <label for="auth-name" class="block text-sm font-medium text-slate-700">Tên</label>
+                    <input id="auth-name" name="Name" type="text" class="w-full px-3 py-2 mt-1 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="auth-email" class="block text-sm font-medium text-slate-700">Địa chỉ email</label>
+                    <input id="auth-email" name="Email" type="email" autocomplete="email" required class="w-full px-3 py-2 mt-1 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div>
+                    <label for="auth-password" class="block text-sm font-medium text-slate-700">Mật khẩu</label>
+                    <input id="auth-password" name="Password" type="password" autocomplete="current-password" required class="w-full px-3 py-2 mt-1 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div id="auth-error" class="text-sm text-red-600"></div>
+                <div>
+                    <button type="submit" id="auth-submit-btn" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400">
+                        <div id="authLoader" class="loader w-5 h-5 rounded-full border-2 border-slate-200 hidden mr-2"></div>
+                        <span id="auth-submit-text">Đăng nhập</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application View -->
+    <div id="app-view" class="hidden">
+        <div class="flex h-screen bg-gray-100">
+            <!-- Sidebar -->
+            <aside class="w-56 bg-white shadow-md flex flex-col">
+                <div class="p-4 border-b">
+                    <h1 class="text-2xl font-bold text-indigo-700">AIBM Platform</h1>
+                </div>
+                <nav id="sidebar-nav" class="flex-grow p-2 space-y-1 overflow-y-auto">
+                    <!-- Group 1: Giao tiếp -->
+                    <h3 class="px-2 py-2 text-xs font-semibold text-slate-500 uppercase">Giao tiếp</h3>
+                    <button data-view="chatbot" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700 active">
+                        <i class="fa-solid fa-robot w-5 text-center"></i> Chatbot
+                    </button>
+                    <!--
+                     <button data-view="chat-logs" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-history w-5 text-center"></i> Chatlogs
+                    </button>
+                    <button data-view="profiles" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-users-cog w-5 text-center"></i> Profiles
+                    </button>
+
+                    <!-- Group 2: Kế hoạch (hidden) 
+                    -->
+                    <h3 class="px-2 py-2 text-xs font-semibold text-slate-500 uppercase mt-4 hidden">Kế hoạch</h3>
+                    <button data-view="planner" class="sidebar-btn hidden w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-calendar-days w-5 text-center"></i> Planner
+                    </button>
+                    <button data-view="tasklist" class="sidebar-btn hidden w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-tasks w-5 text-center"></i> Tasklist
+                    </button>
+                    <button data-view="postlist" class="sidebar-btn hidden w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-share-square w-5 text-center"></i> Postlist
+                    </button>
+                    -->
+
+                    <!-- Group 3: Cơ sở dữ liệu -->
+                    <h3 class="px-2 py-2 text-xs font-semibold text-slate-500 uppercase mt-4">Cơ sở dữ liệu</h3>
+                    <button data-view="ads-db" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-chart-line w-5 text-center"></i> Ads DB
+                    </button>
+                    <!--
+                    <button data-view="sales-db" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-headset w-5 text-center"></i> Sales DB
+                    </button>
+                    <button data-view="acc-db" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-file-invoice-dollar w-5 text-center"></i> Accounting DB
+                    </button>
+                    <button data-view="hr-db" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-user-tie w-5 text-center"></i> HR DB
+                    </button>
+                    <button data-view="product-db" class="sidebar-btn w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-700">
+                        <i class="fa-solid fa-boxes-stacked w-5 text-center"></i> Product DB
+                    </button>
+                    -->
+                </nav>
+                <div class="p-4 border-t">
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="font-medium text-slate-700">Xin chào, <span id="currentUserEmail"></span>!</span>
+                    </div>
+                    <button id="logoutBtn" class="w-full mt-2 bg-slate-200 text-slate-800 font-semibold px-4 py-2 rounded-lg hover:bg-slate-300 transition-colors shadow-sm">Đăng xuất</button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main id="main-content-area" class="flex-1 p-6 flex flex-col">
+                <div id="main-content-wrapper" class="flex-1 overflow-y-auto">
+                    <!-- Chatbot View -->
+                    <div id="view-chatbot" class="view-container active h-full">
+                        <div class="bg-white rounded-lg shadow-sm p-4 flex flex-col h-full max-w-none">
+                            <div class="flex flex-wrap gap-2 items-center justify-between mb-2 pb-2 border-b">
+                                <h2 class="text-xl font-bold">Chatbot</h2>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-slate-500">ID: <code id="thread-id-display" class="font-mono"></code></span>
+                                    <button id="new-chat-btn" class="bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1 rounded-md hover:bg-indigo-200 transition-colors shrink-0">+ Cuộc trò chuyện mới</button>
+                                </div>
+                            </div>
+                            <div id="chat-messages" class="flex-grow overflow-y-auto mb-4 pr-2 space-y-4 min-h-[300px]">
+                                 <div class="flex justify-start"><div class="chat-bubble-ai p-3 rounded-lg max-w-none">Xin chào! Tôi có thể giúp gì cho bạn?</div></div>
+                            </div>
+                            <div class="flex gap-2 border-t pt-4">
+                                <input type="text" id="chat-input" placeholder="Hỏi AI qua webhook..." class="flex-grow w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition">
+                                <button id="chat-send-btn" class="bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center disabled:bg-indigo-400 shrink-0">Gửi</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Ads DB View -->
+                    <div id="view-ads-db" class="view-container">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">Ads Database</h1>
+                             <div class="flex items-center gap-2">
+                                <button data-db-type="ads-db" class="db-add-record-btn bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                                    <i class="fa-solid fa-plus"></i> Thêm Bản ghi
+                                </button>
+                                <button id="refreshDataBtn" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 disabled:bg-blue-400">
+                                    <i id="refreshDataIcon" class="fa-solid fa-sync"></i>
+                                    <div id="dataLoader" class="loader w-5 h-5 rounded-full border-2 border-slate-200 hidden"></div>
+                                    Làm mới
+                                </button>
+                            </div>
+                        </div>
+                        <p id="lastUpdated" class="text-slate-600 mb-4 text-sm">Đang tải dữ liệu...</p>
+                        <!-- KPI Cards & Charts -->
+                        <div id="dashboard-content">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                                <div class="kpi-card bg-white p-6 rounded-lg shadow-sm"><div><p class="text-sm text-slate-500">Tổng chi tiêu</p><p id="kpi-spend" class="text-2xl font-bold">0</p></div></div>
+                                <div class="kpi-card bg-white p-6 rounded-lg shadow-sm"><div><p class="text-sm text-slate-500">Lượt hiển thị</p><p id="kpi-impressions" class="text-2xl font-bold">0</p></div></div>
+                                <div class="kpi-card bg-white p-6 rounded-lg shadow-sm"><div><p class="text-sm text-slate-500">CPC Trung bình</p><p id="kpi-cpc" class="text-2xl font-bold">0</p></div></div>
+                                <div class="kpi-card bg-white p-6 rounded-lg shadow-sm"><div><p class="text-sm text-slate-500">Tổng Click</p><p id="kpi-clicks" class="text-2xl font-bold">0</p></div></div>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                <div class="bg-white p-4 rounded-lg shadow-sm chart-container flex flex-col"><h3 class="font-semibold mb-4">Hiệu suất theo Nhóm quảng cáo</h3><div class="flex-grow"><canvas id="performanceChart"></canvas></div></div>
+                                <div class="bg-white p-4 rounded-lg shadow-sm chart-container flex flex-col"><h3 class="font-semibold mb-4">Phân bổ chi tiêu</h3><div class="flex-grow"><canvas id="campaignSpendChart"></canvas></div></div>
+                            </div>
+                            <!-- Data Table -->
+                            <div id="ads-db-record-list" class="bg-white p-4 rounded-lg shadow-sm">
+                                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                                    <h3 class="font-semibold text-lg">Record List</h3>
+                                    <div class="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                                         <select id="campaignFilter" class="w-full md:w-48 p-2 border border-slate-300 rounded-md"></select>
+                                         <input type="number" id="minSpendFilter" placeholder="Chi tiêu min" class="w-full p-2 border border-slate-300 rounded-md">
+                                         <input type="number" id="maxSpendFilter" placeholder="Chi tiêu max" class="w-full p-2 border border-slate-300 rounded-md">
+                                         <input type="text" id="searchInput" placeholder="Tìm kiếm nhóm..." class="w-full md:w-64 p-2 border border-slate-300 rounded-md">
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto"><table class="min-w-full divide-y divide-slate-200"><thead class="bg-slate-50"><tr>
+                                    <th scope="col" class="sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="campaign">Nhóm quảng cáo <span class="sort-icon"></span></th>
+                                    <th scope="col" class="sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="spend">Chi tiêu <span class="sort-icon"></span></th>
+                                    <th scope="col" class="sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="impressions">Hiển thị <span class="sort-icon"></span></th>
+                                    <th scope="col" class="sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="clicks">Clicks <span class="sort-icon"></span></th>
+                                    <th scope="col" class="sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="cpc">CPC <span class="sort-icon"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Hành động</th>
+                                </tr></thead><tbody id="adsDataTableBody" class="bg-white divide-y divide-slate-200"></tbody></table></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Profiles View -->
+                    <div id="view-profiles" class="view-container">
+                        <h1 class="text-2xl font-bold text-slate-900 mb-6">Profiles</h1>
+                        <!-- My Account Section -->
+                        <div class="bg-white p-6 rounded-lg shadow-sm mb-6">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-800">Tài khoản của tôi</h2>
+                            <div id="my-account-details" class="space-y-2 text-slate-600">
+                                <!-- User details will be populated by JS -->
+                            </div>
+                        </div>
+                        <!-- Member List Section (Admin only) -->
+                        <div id="member-list-section" class="hidden">
+                             <div class="flex justify-between items-center mb-4">
+                                <h1 class="text-2xl font-bold text-slate-900">Quản lý Thành viên</h1>
+                                <div class="flex items-center gap-2">
+                                    <button id="addUserBtn" class="bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center justify-center">
+                                        <i class="fa-solid fa-user-plus mr-2"></i><span>Thêm Thành viên</span>
+                                    </button>
+                                    <button id="refreshUsersBtn" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center disabled:bg-blue-400 disabled:cursor-wait">
+                                        <i id="refreshUsersIcon" class="fa-solid fa-sync"></i>
+                                        <div id="usersLoader" class="loader w-5 h-5 rounded-full border-2 border-slate-200 hidden mr-2"></div>
+                                        <span class="ml-2">Làm mới</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                                    <h3 class="font-semibold text-lg">Danh sách thành viên</h3>
+                                    <div class="flex items-center gap-4 w-full md:w-auto">
+                                        <input type="text" id="userSearchInput" placeholder="Tìm kiếm email hoặc tên..." class="w-full md:w-64 p-2 border border-slate-300 rounded-md">
+                                    </div>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-slate-200">
+                                        <thead class="bg-slate-50">
+                                            <tr>
+                                                <th scope="col" class="user-sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="Name">Tên <span class="sort-icon"></span></th>
+                                                <th scope="col" class="user-sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="Email">Email <span class="sort-icon"></span></th>
+                                                <th scope="col" class="user-sortable-header px-6 py-3 text-left text-xs font-medium text-slate-500" data-sort-key="Role">Vai trò <span class="sort-icon"></span></th>
+                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Hành động</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="usersDataTableBody" class="bg-white divide-y divide-slate-200"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Logs View -->
+                    <div id="view-chat-logs" class="view-container">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">Lịch sử Cuộc trò chuyện</h1>
+                            <button id="refreshChatLogsBtn" class="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center disabled:bg-blue-400 disabled:cursor-wait">
+                                <i id="refreshChatLogsIcon" class="fa-solid fa-sync"></i>
+                                <div id="chatLogsLoader" class="loader w-5 h-5 rounded-full border-2 border-slate-200 hidden mr-2"></div>
+                                <span class="ml-2">Làm mới</span>
+                            </button>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                                <h3 class="font-semibold text-lg">Danh sách cuộc trò chuyện</h3>
+                                <div class="flex items-center gap-4 w-full md:w-auto">
+                                    <input type="text" id="chatLogsSearchInput" placeholder="Tìm kiếm..." class="w-full md:w-64 p-2 border border-slate-300 rounded-md">
+                                </div>
+                            </div>
+                            <div id="chat-logs-container" class="space-y-3">
+                                <!-- Conversation logs will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planner View -->
+                    <div id="view-planner" class="view-container">
+                        <h1 class="text-2xl font-bold text-slate-900 mb-4">Planner Tổng hợp</h1>
+                        <div class="mb-4 border-b border-gray-200">
+                            <nav id="planner-tabs" class="flex space-x-4" aria-label="Tabs">
+                                <button data-tab="overview" class="planner-tab-btn active whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm">Tổng quan</button>
+                                <button data-tab="erp-pm" class="planner-tab-btn whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm">ERP PM/CM</button>
+                                <button data-tab="cdp-cm" class="planner-tab-btn whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm">CDP CM</button>
+                                <button data-tab="mes-pm" class="planner-tab-btn whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm">MES PM</button>
+                            </nav>
+                        </div>
+                        <div id="planner-content">
+                            <!-- Overview Tab -->
+                            <div id="planner-tab-overview" class="planner-tab-content">
+                                <div class="bg-white p-4 rounded-lg shadow-sm">
+                                    <div class="grid grid-cols-7 text-center font-bold text-slate-600 border-b pb-2">
+                                        <div>Chủ Nhật</div><div>Thứ 2</div><div>Thứ 3</div><div>Thứ 4</div><div>Thứ 5</div><div>Thứ 6</div><div>Thứ 7</div>
+                                    </div>
+                                    <div id="planner-grid" class="grid grid-cols-7 grid-rows-5 gap-px bg-slate-200 border-l border-r border-b border-slate-200">
+                                        <!-- Calendar cells will be generated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                             <!-- ERP PM/CM Tab -->
+                            <div id="planner-tab-erp-pm" class="planner-tab-content hidden">
+                                <h2 class="text-xl font-bold text-slate-900 mb-4">ERP Project & Content Management</h2>
+                                <div class="space-y-6">
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Master - Projection & Definition</h3>
+                                        <div id="erp-pm-form" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Master - Trends & Strategy</h3>
+                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <div class="chart-container"><canvas id="tiktokTrendChart"></canvas></div>
+                                            <div class="diagram-placeholder flex items-center justify-center"><div class="text-slate-500"><i class="fa-solid fa-sitemap text-4xl mb-2"></i><p>Content Strategy Diagram</p></div></div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Action - Task & Content Plan</h3>
+                                        <p class="text-slate-600 mb-4">Task list được quản lý chi tiết tại module <button class="text-indigo-600 font-semibold hover:underline" onclick="document.querySelector('[data-view=tasklist]').click()">Tasklist</button>.</p>
+                                        <p class="text-slate-600">Kế hoạch nội dung được quản lý chi tiết tại module <button class="text-indigo-600 font-semibold hover:underline" onclick="document.querySelector('[data-view=postlist]').click()">Postlist</button>.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- CDP CM Tab -->
+                            <div id="planner-tab-cdp-cm" class="planner-tab-content hidden">
+                                <h2 class="text-2xl font-bold text-slate-900 mb-4">CDP Content Management</h2>
+                                <div class="space-y-6">
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Master - Product Trends & Broadcasting Strategy</h3>
+                                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <div class="chart-container"><canvas id="tiktokShopChart"></canvas></div>
+                                            <div class="diagram-placeholder flex items-center justify-center"><div class="text-slate-500"><i class="fa-solid fa-broadcast-tower text-4xl mb-2"></i><p>Broadcasting Strategy Diagram</p></div></div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Action - Broadcast Titles</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div><h4 class="font-bold mb-2">New Customers</h4><ul class="list-disc list-inside text-sm space-y-1 bg-slate-50 p-3 rounded-md"><li>"Chào bạn mới, nhận ngay voucher -50%!"</li><li>"Khám phá thế giới của chúng tôi, bắt đầu từ đây."</li></ul></div>
+                                            <div><h4 class="font-bold mb-2">Old Customers</h4><ul class="list-disc list-inside text-sm space-y-1 bg-slate-50 p-3 rounded-md"><li>"Một món quà tri ân dành riêng cho bạn."</li><li>"Bạn đã bỏ lỡ siêu phẩm này, xem ngay!"</li></ul></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- MES PM Tab -->
+                            <div id="planner-tab-mes-pm" class="planner-tab-content hidden">
+                                <h2 class="text-2xl font-bold text-slate-900 mb-4">MES Project Management</h2>
+                                <div class="space-y-6">
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Master - Khởi tạo 1-Time Setup</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div class="diagram-placeholder"><i class="fa-solid fa-flask-vial text-3xl mb-2"></i><p>Công thức & Flowchart Sản xuất</p></div>
+                                            <div class="diagram-placeholder"><i class="fa-solid fa-truck-fast text-3xl mb-2"></i><p>Map Nhà cung cấp & Phân phối</p></div>
+                                            <div class="diagram-placeholder"><i class="fa-solid fa-link text-3xl mb-2"></i><p>ERP Integration: Sale - Manu - Purchase</p></div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                                        <h3 class="text-xl font-semibold mb-4">Action - CRONJOB Dashboard</h3>
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full text-sm">
+                                                <thead class="bg-slate-50"><tr><th class="p-2">Tên Job</th><th class="p-2">Lịch chạy</th><th class="p-2">Lần chạy cuối</th><th class="p-2">Trạng thái</th><th class="p-2">Hành động</th></tr></thead>
+                                                <tbody>
+                                                    <tr class="border-b"><td class="p-2">Đồng bộ tồn kho</td><td class="p-2">Mỗi 15 phút</td><td class="p-2">1 phút trước</td><td class="p-2 text-green-600">Thành công</td><td class="p-2"><button class="text-indigo-600">Chạy ngay</button></td></tr>
+                                                    <tr class="border-b"><td class="p-2">Gửi báo cáo sản lượng</td><td class="p-2">08:00 mỗi ngày</td><td class="p-2">Hôm qua</td><td class="p-2 text-green-600">Thành công</td><td class="p-2"><button class="text-indigo-600">Chạy ngay</button></td></tr>
+                                                    <tr class="border-b"><td class="p-2">Kiểm tra nhiệt độ lò</td><td class="p-2">Mỗi 5 phút</td><td class="p-2">30 giây trước</td><td class="p-2 text-red-600">Thất bại</td><td class="p-2"><button class="text-indigo-600">Chạy ngay</button></td></tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tasklist View -->
+                    <div id="view-tasklist" class="view-container">
+                        <h1 class="text-2xl font-bold text-slate-900 mb-4">Tasklist</h1>
+                        <div id="task-manager-kanban" class="flex space-x-4 overflow-x-auto pb-4">
+                            <!-- Kanban columns will be generated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Postlist View -->
+                    <div id="view-postlist" class="view-container">
+                         <h1 class="text-2xl font-bold text-slate-900 mb-4">Postlist</h1>
+                         <div class="space-y-6">
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-800 mb-2">Từ Kế hoạch ERP CM</h2>
+                                <div class="bg-white p-4 rounded-lg shadow-sm">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div><h3 class="font-bold mb-2">Tiktok Videos</h3><ul class="list-disc list-inside text-sm space-y-1"><li>Video unboxing sản phẩm mới</li><li>Trend biến hình với SP A</li><li>Review chân thực từ KOC</li></ul></div>
+                                        <div><h3 class="font-bold mb-2">Wordpress Blogs</h3><ul class="list-disc list-inside text-sm space-y-1"><li>Top 5 cách phối đồ với SP B</li><li>Lịch sử thương hiệu và câu chuyện</li><li>Hướng dẫn bảo quản sản phẩm</li></ul></div>
+                                        <div><h3 class="font-bold mb-2">Facebook Posts</h3><ul class="list-disc list-inside text-sm space-y-1"><li>Album ảnh feedback khách hàng</li><li>Video hậu trường sản xuất</li><li>Minigame tương tác cuối tuần</li></ul></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-slate-800 mb-2">Từ Kế hoạch CDP CM</h2>
+                                <div class="bg-white p-4 rounded-lg shadow-sm">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div><h3 class="font-bold mb-2">Broadcast Mailchimp</h3><ul class="list-disc list-inside text-sm space-y-1"><li>[Segment: VIP] Ưu đãi độc quyền chỉ dành cho bạn</li><li>[Segment: New] Chào mừng bạn, khám phá ngay!</li></ul></div>
+                                        <div><h3 class="font-bold mb-2">Zalo Broadcast</h3><ul class="list-disc list-inside text-sm space-y-1"><li>[Segment: Inactive] Nhớ bạn quá, quay lại nhé!</li><li>[Segment: High-Value] Cảm ơn sự đồng hành của bạn</li></ul></div>
+                                    </div>
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+                    
+                    <!-- Sales DB View -->
+                    <div id="view-sales-db" class="view-container">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">Sales Database</h1>
+                            <button data-db-type="sales-db" class="db-add-record-btn bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Bản ghi
+                            </button>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <h2 class="text-xl font-semibold mb-4">Record List (Pipeline)</h2>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full text-sm">
+                                    <thead class="bg-slate-50"><tr><th class="p-2 text-left">Tên</th><th class="p-2 text-left">Công ty</th><th class="p-2 text-left">Giai đoạn</th><th class="p-2 text-left">Người phụ trách</th><th class="p-2 text-left">Thẻ</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                    <tbody>
+                                        <tr class="border-b"><td class="p-2">Anh Minh</td><td class="p-2">Công ty ABC</td><td class="p-2"><span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Lead mới</span></td><td class="p-2">Vân Anh</td><td class="p-2"><span class="bg-gray-200 px-2 py-1 rounded text-xs">Nguồn: Website</span></td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        <tr class="border-b"><td class="p-2">Chị Bích</td><td class="p-2">Tập đoàn XYZ</td><td class="p-2"><span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">Đã liên hệ</span></td><td class="p-2">Vân Anh</td><td class="p-2"><span class="bg-gray-200 px-2 py-1 rounded text-xs">Quan tâm SP 1</span></td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        <tr class="border-b"><td class="p-2">Anh Cường</td><td class="p-2">Startup DEF</td><td class="p-2"><span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Thắng</span></td><td class="p-2">Minh Tú</td><td class="p-2"><span class="bg-gray-200 px-2 py-1 rounded text-xs">Nguồn: Giới thiệu</span></td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Accounting DB View -->
+                    <div id="view-acc-db" class="view-container">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">Accounting Database</h1>
+                            <button data-db-type="acc-db" class="db-add-record-btn bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Hợp đồng/Hóa đơn
+                            </button>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Hợp đồng)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã HĐ</th><th class="p-2 text-left">Tên HĐ</th><th class="p-2 text-left">Khách hàng</th><th class="p-2 text-left">Giá trị</th><th class="p-2 text-left">Trạng thái</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">HD-001</td><td class="p-2">Cung cấp dịch vụ MKT</td><td class="p-2">Anh Cường</td><td class="p-2">50,000,000đ</td><td class="p-2 text-green-600">Hoạt động</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">HD-002</td><td class="p-2">Bán sản phẩm B</td><td class="p-2">Công ty KLM</td><td class="p-2">120,000,000đ</td><td class="p-2 text-green-600">Hoạt động</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Hóa đơn)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã HĐ</th><th class="p-2 text-left">Ngày tạo</th><th class="p-2 text-left">Số tiền</th><th class="p-2 text-left">Hạn TT</th><th class="p-2 text-left">Trạng thái</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">INV-1023</td><td class="p-2">06/08/2025</td><td class="p-2">25,000,000đ</td><td class="p-2">13/08/2025</td><td class="p-2 text-orange-500">Chưa thanh toán</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">INV-1022</td><td class="p-2">01/08/2025</td><td class="p-2">120,000,000đ</td><td class="p-2">08/08/2025</td><td class="p-2 text-green-600">Đã thanh toán</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- HR DB View -->
+                    <div id="view-hr-db" class="view-container">
+                        <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">HR Database</h1>
+                            <button data-db-type="hr-db" class="db-add-record-btn bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Ứng viên/Nhân viên
+                            </button>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Ứng viên)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Tên</th><th class="p-2 text-left">Vị trí</th><th class="p-2 text-left">Trạng thái</th><th class="p-2 text-left">Ngày nộp</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">Lê Thị Duyên</td><td class="p-2">Marketing Executive</td><td class="p-2 text-blue-600">Phỏng vấn V1</td><td class="p-2">02/08/2025</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">Phạm Văn Em</td><td class="p-2">Sales Manager</td><td class="p-2 text-yellow-600">Chờ phản hồi</td><td class="p-2">29/07/2025</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Nhân viên & Bảng lương)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã NV</th><th class="p-2 text-left">Tên</th><th class="p-2 text-left">Phòng ban</th><th class="p-2 text-left">Lương T7/2025</th><th class="p-2 text-left">Trạng thái TT</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">NV001</td><td class="p-2">Trần Vân Anh</td><td class="p-2">Sales</td><td class="p-2">25,000,000đ</td><td class="p-2 text-green-600">Đã trả (05/08)</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">NV002</td><td class="p-2">Nguyễn Minh Tú</td><td class="p-2">Sales</td><td class="p-2">22,000,000đ</td><td class="p-2 text-green-600">Đã trả (05/08)</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Product DB View -->
+                    <div id="view-product-db" class="view-container">
+                         <div class="flex justify-between items-center mb-4">
+                            <h1 class="text-2xl font-bold text-slate-900">Product & Inventory Database</h1>
+                            <button data-db-type="product-db" class="db-add-record-btn bg-green-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Thêm Order/Log
+                            </button>
+                        </div>
+                        <div class="space-y-6">
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Kế hoạch sản xuất)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã Order</th><th class="p-2 text-left">Ngày đặt</th><th class="p-2 text-left">Sản phẩm</th><th class="p-2 text-left">Số lượng</th><th class="p-2 text-left">Trạng thái</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">PO-0725-01</td><td class="p-2">25/07/2025</td><td class="p-2">Sản phẩm A</td><td class="p-2">500</td><td class="p-2 text-green-600">Hoàn thành</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">PO-0825-01</td><td class="p-2">01/08/2025</td><td class="p-2">Sản phẩm B</td><td class="p-2">1000</td><td class="p-2 text-blue-600">Đang sản xuất</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <h2 class="text-xl font-semibold mb-4">Record List (Nhập/Xuất kho)</h2>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full text-sm">
+                                        <thead class="bg-slate-50"><tr><th class="p-2 text-left">Mã Phiếu</th><th class="p-2 text-left">Loại</th><th class="p-2 text-left">Sản phẩm</th><th class="p-2 text-left">Số lượng</th><th class="p-2 text-left">Kho</th><th class="p-2 text-left">Hành động</th></tr></thead>
+                                        <tbody>
+                                            <tr class="border-b"><td class="p-2">XUAT-112</td><td class="p-2 text-red-500">Xuất</td><td class="p-2">Sản phẩm A</td><td class="p-2">200</td><td class="p-2">Kho thành phẩm</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                            <tr class="border-b"><td class="p-2">NHAP-256</td><td class="p-2 text-green-500">Nhập</td><td class="p-2">Nguyên liệu X</td><td class="p-2">50 kg</td><td class="p-2">Kho nguyên liệu</td><td class="p-2"><button class="text-indigo-600 text-xs">Xem/Sửa</button></td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals and Popups -->
+    <div id="error-message" class="hidden fixed top-5 right-5 z-50 p-4 bg-red-100 border-l-4 border-red-500 text-red-700"></div>
+    <div id="recordModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div id="modalOverlay" class="absolute inset-0 bg-black bg-opacity-50 modal-overlay"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded-lg shadow-xl z-50 overflow-y-auto transform scale-95 opacity-0">
+            <div class="p-6">
+                <h3 id="modalTitle" class="text-xl font-semibold mb-4"></h3>
+                <form id="recordForm">
+                    <input type="hidden" id="originalIdentifier">
+                    <div id="modal-fields-container" class="space-y-4"></div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button type="button" id="cancelModalBtn" class="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300">Hủy</button>
+                        <button type="submit" id="submitFormBtn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center disabled:bg-green-400">
+                            <div id="formLoader" class="loader w-4 h-4 rounded-full border-2 border-slate-200 hidden mr-2"></div>
+                            Gửi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="deleteConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+        <div class="bg-white w-11/12 md:max-w-sm mx-auto rounded-lg shadow-xl z-50 p-6">
+            <h3 class="text-lg font-bold text-slate-900">Xác nhận Xóa</h3>
+            <p class="text-slate-600 mt-2 mb-6">Bạn có chắc chắn muốn xóa mục này không? Hành động này không thể hoàn tác.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancelDeleteBtn" class="px-4 py-2 bg-slate-200 text-slate-800 rounded-md hover:bg-slate-300">Hủy</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center">Xóa</button>
+            </div>
+        </div>
+    </div>
+    <div id="confirmationPopup" class="fixed bottom-5 right-5 bg-green-500 text-white py-3 px-6 rounded-lg shadow-lg transform translate-y-20 opacity-0 confirmation-popup">Thao tác thành công!</div>
+
+    <script type="module">
+        // --- CONFIGURATION ---
+// Webhook URLs and API keys moved to serverless API endpoints.
+        // --- DOM ELEMENTS ---
+        const authView = document.getElementById('auth-view');
+        const appView = document.getElementById('app-view');
+        const authForm = document.getElementById('auth-form');
+        const authTitle = document.getElementById('auth-title');
+        const authToggleBtn = document.getElementById('auth-toggle-btn');
+        const authSubmitBtn = document.getElementById('auth-submit-btn');
+        const authSubmitText = document.getElementById('auth-submit-text');
+        const authError = document.getElementById('auth-error');
+        const authLoader = document.getElementById('authLoader');
+        const registerNameField = document.getElementById('register-name-field');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const currentUserEmail = document.getElementById('currentUserEmail');
+        const sidebarNav = document.getElementById('sidebar-nav');
+        const mainContentArea = document.getElementById('main-content-area');
+        
+        const lastUpdated = document.getElementById('lastUpdated');
+        const refreshDataBtn = document.getElementById('refreshDataBtn');
+        const errorMessage = document.getElementById('error-message');
+        const dataLoader = document.getElementById('dataLoader');
+        const refreshDataIcon = document.getElementById('refreshDataIcon');
+        
+        const kpiSpend = document.getElementById('kpi-spend');
+        const kpiImpressions = document.getElementById('kpi-impressions');
+        const kpiCpc = document.getElementById('kpi-cpc');
+        const kpiClicks = document.getElementById('kpi-clicks');
+        
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const threadIdDisplay = document.getElementById('thread-id-display');
+        
+        const addUserBtn = document.getElementById('addUserBtn');
+        const refreshUsersBtn = document.getElementById('refreshUsersBtn');
+        const refreshChatLogsBtn = document.getElementById('refreshChatLogsBtn');
+
+        const recordModal = document.getElementById('recordModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const modalContainer = recordModal.querySelector('.modal-container');
+        const modalTitle = document.getElementById('modalTitle');
+        const recordForm = document.getElementById('recordForm');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+        const submitFormBtn = document.getElementById('submitFormBtn');
+        const formLoader = document.getElementById('formLoader');
+        const adsDataTableBody = document.getElementById('adsDataTableBody');
+        const usersDataTableBody = document.getElementById('usersDataTableBody');
+        const chatLogsContainer = document.getElementById('chat-logs-container');
+
+        const confirmationPopup = document.getElementById('confirmationPopup');
+        const searchInput = document.getElementById('searchInput');
+        const userSearchInput = document.getElementById('userSearchInput');
+        const chatLogsSearchInput = document.getElementById('chatLogsSearchInput');
+        const minSpendFilter = document.getElementById('minSpendFilter');
+        const maxSpendFilter = document.getElementById('maxSpendFilter');
+        const campaignFilter = document.getElementById('campaignFilter');
+
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+        // --- STATE ---
+        let allAdsData = [], displayedAdsData = [];
+        let allUsersData = [], displayedUsersData = [];
+        let allChatLogsData = [], displayedConversations = [];
+        let charts = {};
+        let isProcessing = false;
+        let authMode = 'login';
+        let currentUser = null;
+        let itemToEdit = null;
+        let itemToDelete = null;
+        let adsSortConfig = { key: 'campaign', direction: 'ascending' };
+        let usersSortConfig = { key: 'Name', direction: 'ascending' };
+        let activeThreadId = crypto.randomUUID();
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeUI();
+            addEventListeners();
+            checkAuth();
+        });
+
+        function initializeUI() {
+            initializePlanner();
+            initializeTaskManager();
+            initializeErpPmForm();
+            injectAiSections();
+            
+            const erpCmCtx = document.getElementById('tiktokTrendChart')?.getContext('2d');
+            if (erpCmCtx) new Chart(erpCmCtx, { type: 'line', data: { labels: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'], datasets: [{ label: 'Google Search Trend: "Áo Dài"', data: [65, 59, 80, 81, 56, 55], borderColor: '#3b82f6' }, { label: 'Tiktok Hashtag: #aodai', data: [28, 48, 40, 19, 86, 27], borderColor: '#ef4444' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Google & Tiktok Trends' } } } });
+            
+            const cdpCmCtx = document.getElementById('tiktokShopChart')?.getContext('2d');
+            if (cdpCmCtx) new Chart(cdpCmCtx, { type: 'bar', data: { labels: ['Son môi', 'Kem chống nắng', 'Mặt nạ', 'Serum'], datasets: [{ label: 'Lượt tìm kiếm', data: [1200, 1900, 300, 500], backgroundColor: '#8b5cf6' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Tiktok Shop Product Search' } } } });
+        }
+
+        function initializePlanner() {
+            const container = document.getElementById('planner-grid');
+            if (!container) return;
+            container.innerHTML = '';
+            for (let i = 0; i < 35; i++) {
+                const day = (i % 35) + 1;
+                const cell = document.createElement('div');
+                cell.className = 'bg-white p-2 h-24 border-t border-l border-slate-200';
+                if (day <= 31) {
+                    cell.innerHTML = `<span class="text-sm font-semibold">${day}</span>`;
+                    if (day === 8) cell.innerHTML += `<div class="text-xs bg-blue-100 text-blue-800 p-1 rounded mt-1">Họp team MKT</div>`;
+                    if (day === 15) cell.innerHTML += `<div class="text-xs bg-green-100 text-green-800 p-1 rounded mt-1">Ra mắt SP mới</div>`;
+                } else {
+                    cell.className += ' bg-slate-50';
+                }
+                container.appendChild(cell);
+            }
+        }
+
+        function initializeTaskManager() {
+            const container = document.getElementById('task-manager-kanban');
+            if (!container) return;
+            const departments = {
+                "MKT": [{ id: 1, title: "Deepresearch outline for PR", team: "Content" }, { id: 2, title: "Tối ưu ads campain X", team: "Perform" }],
+                "Sales": [{ id: 3, title: "Follow-up lead A", team: "Lead" }, { id: 4, title: "Gen proposal cho khách B", team: "Lead" }],
+                "Product": [{ id: 5, title: "OCR giấy nhận hàng", team: "Tech" }],
+                "Acc": [{ id: 6, title: "Scan contract/invoice", team: "Tech" }],
+                "HR": [{ id: 7, title: "Scan CVs for new role", team: "Recruit" }]
+            };
+            container.innerHTML = '';
+            Object.keys(departments).forEach(dept => {
+                const column = document.createElement('div');
+                column.className = 'kanban-column bg-slate-100 rounded-lg p-3 flex-shrink-0';
+                let tasksHtml = '';
+                departments[dept].forEach(task => {
+                    tasksHtml += `<div class="task-card bg-white p-3 rounded-md shadow-sm mb-3">
+                        <p class="font-semibold text-sm">${task.title}</p>
+                        <p class="text-xs text-slate-500 mt-1">Team: ${task.team}</p>
+                    </div>`;
+                });
+                column.innerHTML = `<h3 class="font-bold text-slate-800 mb-3">${dept}</h3><div class="space-y-3">${tasksHtml}</div>`;
+                container.appendChild(column);
+            });
+        }
+        
+        function initializeErpPmForm() {
+            const container = document.getElementById('erp-pm-form');
+            if (!container) return;
+            const fields = [
+                "Suggest segment", "Suggest recruitment", "Giá bán nhóm sp 1", "Giá bán nhóm sp 2", "Giá bán nhóm sp 3", "Giá bán nhóm sp 4",
+                "Tốc độ tăng trưởng từng tháng doanh số SP1 trong 6 tháng đầu", "Doanh số tháng đầu của SP 1",
+                "% tương quan doanh số giữa SP 2 so với SP 1", "Giá thành nhóm sp 1", "Giá thành nhóm sp 2", "Giá thành nhóm sp 3", "Giá thành nhóm sp 4",
+                "Tỉ lệ ngân sách marketing/doanh thu", "Tỉ lệ ngân sách sales/doanh thu", "Tỉ lệ free trial/meeting", "Tỉ lệ chốt sales"
+            ];
+            container.innerHTML = '';
+            fields.forEach(field => {
+                const div = document.createElement('div');
+                div.innerHTML = `<label class="block text-sm font-medium text-slate-600">${field}</label>
+                                 <input type="text" placeholder="Input for ${field}" class="mt-1 w-full p-2 border border-slate-300 rounded-md">`;
+                container.appendChild(div);
+            });
+        }
+        
+        function addEventListeners() {
+            authForm.addEventListener('submit', handleAuthSubmit);
+            authToggleBtn.addEventListener('click', toggleAuthMode);
+            logoutBtn.addEventListener('click', handleLogout);
+
+            sidebarNav.addEventListener('click', (e) => {
+                const button = e.target.closest('.sidebar-btn');
+                if (button) {
+                    const viewName = button.dataset.view;
+                    switchView(viewName);
+                }
+            });
+
+            document.getElementById('planner-tabs').addEventListener('click', (e) => {
+                const button = e.target.closest('.planner-tab-btn');
+                if (button) {
+                    const tabName = button.dataset.tab;
+                    switchPlannerTab(tabName);
+                }
+            });
+
+            chatSendBtn.addEventListener('click', handleChatSubmit);
+            chatInput.addEventListener('keyup', (event) => { if (event.key === 'Enter') handleChatSubmit(); });
+            newChatBtn.addEventListener('click', startNewChat);
+            
+            refreshDataBtn.addEventListener('click', loadAdsFromWebhook);
+            mainContentArea.addEventListener('click', handleMainContentClick);
+
+            searchInput.addEventListener('input', applyAdsFiltersAndSorting);
+            minSpendFilter.addEventListener('input', applyAdsFiltersAndSorting);
+            maxSpendFilter.addEventListener('input', applyAdsFiltersAndSorting);
+            campaignFilter.addEventListener('change', applyAdsFiltersAndSorting);
+            document.querySelectorAll('.sortable-header').forEach(h => h.addEventListener('click', () => handleSort('ads', h.dataset.sortKey)));
+            
+            refreshUsersBtn.addEventListener('click', loadUsersFromWebhook);
+            addUserBtn.addEventListener('click', () => openModal('users'));
+            userSearchInput.addEventListener('input', applyUsersFiltersAndSorting);
+            document.querySelectorAll('.user-sortable-header').forEach(h => h.addEventListener('click', () => handleSort('users', h.dataset.sortKey)));
+
+            refreshChatLogsBtn.addEventListener('click', loadChatLogsFromWebhook);
+            chatLogsSearchInput.addEventListener('input', applyChatLogsFiltersAndSorting);
+
+            cancelModalBtn.addEventListener('click', hideModal);
+            modalOverlay.addEventListener('click', hideModal);
+            recordForm.addEventListener('submit', handleFormSubmit);
+            cancelDeleteBtn.addEventListener('click', hideDeleteModal);
+            confirmDeleteBtn.addEventListener('click', processDelete);
+        }
+
+        function switchView(viewName) {
+            document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.sidebar-btn').forEach(b => b.classList.remove('active'));
+            const view = document.getElementById(`view-${viewName}`);
+            if (view) view.classList.add('active');
+            const button = document.querySelector(`.sidebar-btn[data-view=${viewName}]`);
+            if (button) button.classList.add('active');
+        }
+
+        function switchPlannerTab(tabName) {
+            document.querySelectorAll('.planner-tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.planner-tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`planner-tab-${tabName}`).classList.remove('hidden');
+            document.querySelector(`.planner-tab-btn[data-tab=${tabName}]`).classList.add('active');
+        }
+
+        // --- AUTHENTICATION ---
+        function checkAuth() {
+            const user = sessionStorage.getItem('currentUser');
+            if (user) {
+                currentUser = JSON.parse(user);
+                showAppView();
+            } else {
+                showAuthView();
+            }
+        }
+
+        function showAppView() {
+            authView.classList.add('hidden');
+            appView.style.display = 'flex';
+            currentUserEmail.textContent = currentUser.Email;
+            
+            const isAdmin = currentUser.Role && currentUser.Role.toLowerCase() === 'admin';
+            document.getElementById('member-list-section').classList.toggle('hidden', !isAdmin);
+            
+            const accountDetails = document.getElementById('my-account-details');
+            accountDetails.innerHTML = `
+                <p><strong>Tên:</strong> ${currentUser.Name}</p>
+                <p><strong>Email:</strong> ${currentUser.Email}</p>
+                <p><strong>Vai trò:</strong> ${currentUser.Role}</p>
+            `;
+
+            loadInitialData();
+            initializeOriginalCharts();
+        }
+
+        function showAuthView() {
+            appView.style.display = 'none';
+            authView.classList.remove('hidden');
+            sessionStorage.removeItem('currentUser');
+            currentUser = null;
+        }
+
+        function toggleAuthMode() {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            authError.textContent = '';
+            authError.className = 'text-sm text-red-600';
+            const nameInput = document.getElementById('auth-name');
+            if (authMode === 'register') {
+                authTitle.textContent = 'Tạo tài khoản';
+                authToggleBtn.textContent = 'đăng nhập vào tài khoản đã có';
+                authSubmitText.textContent = 'Đăng ký';
+                registerNameField.classList.remove('hidden');
+                nameInput.required = true;
+            } else {
+                authTitle.textContent = 'Đăng nhập';
+                authToggleBtn.textContent = 'tạo một tài khoản mới';
+                authSubmitText.textContent = 'Đăng nhập';
+                registerNameField.classList.add('hidden');
+                nameInput.required = false;
+            }
+        }
+
+        async function handleAuthSubmit(e) {
+            e.preventDefault();
+            if (isProcessing) return;
+            setLoadingState(true, 'auth');
+            authError.textContent = '';
+            authError.className = 'text-sm text-red-600';
+
+            const formData = new FormData(authForm);
+            const data = Object.fromEntries(formData.entries());
+            
+            const prompt = `task: ${authMode} - data: ${JSON.stringify(data)}`;
+
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt })
+                });
+
+                if (!response.ok) throw new Error(`Lỗi mạng: ${response.statusText}`);
+                
+                const result = await response.json();
+                
+                let output;
+                try {
+                    output = JSON.parse(result[0]?.output || result.output);
+                } catch (err) {
+                    output = result[0]?.output || result.output;
+                }
+                
+                if (authMode === 'login') {
+                    if (output.success && output.user) {
+                        currentUser = output.user;
+                        sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        showAppView();
+                    } else {
+                         throw new Error(output.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+                    }
+                } else if (authMode === 'register') {
+                    if (output.success) {
+                        toggleAuthMode();
+                        authError.textContent = 'Đăng ký thành công! Vui lòng đăng nhập.';
+                        authError.className = 'text-sm text-green-600';
+                    } else {
+                        throw new Error(output.message || 'Đăng ký thất bại.');
+                    }
+                }
+            } catch (error) {
+                authError.textContent = error.message;
+            } finally {
+                setLoadingState(false, 'auth');
+            }
+        }
+
+        function handleLogout() {
+            showAuthView();
+        }
+
+        // --- DATA & CORE LOGIC ---
+        function loadInitialData() {
+            loadAdsFromWebhook();
+            loadChatLogsFromWebhook();
+            if (currentUser.Role && currentUser.Role.toLowerCase() === 'admin') {
+                loadUsersFromWebhook();
+            }
+            updateThreadIdDisplay();
+        }
+
+        function handleSort(type, key) {
+            const config = type === 'ads' ? adsSortConfig : usersSortConfig;
+            if (config.key === key) {
+                config.direction = config.direction === 'ascending' ? 'descending' : 'ascending';
+            } else {
+                config.key = key;
+                config.direction = 'ascending';
+            }
+            if (type === 'ads') applyAdsFiltersAndSorting(); else applyUsersFiltersAndSorting();
+        }
+
+        // --- ADS MODULE ---
+        async function loadAdsFromWebhook() {
+            if (isProcessing) return;
+            setLoadingState(true, 'data');
+            hideError();
+            
+            try {
+                const response = await fetch('/api/get-ads', { method: 'POST' });
+                if (!response.ok) throw new Error(`Lỗi mạng: ${response.status} ${response.statusText}`);
+                const dataArray = await response.json();
+                if (!Array.isArray(dataArray)) throw new Error("Webhook không trả về dữ liệu mảng.");
+
+                allAdsData = dataArray.map((item, index) => ({
+                    row_number: index + 2,
+                    campaign: item['Ad Set Name'],
+                    spend: parseFloat(item['Amount Spent'] || 0),
+                    impressions: parseInt(item['Impressions'] || 0, 10),
+                    clicks: parseInt(item['Link Clicks'] || 0, 10),
+                    cpc: parseFloat(item['CPC (Cost per Link Click)'] || 0)
+                })).filter(item => item.campaign);
+                
+                populateCampaignFilter();
+                applyAdsFiltersAndSorting();
+                lastUpdated.textContent = `Cập nhật lần cuối lúc: ${new Date().toLocaleTimeString('vi-VN')}`;
+            } catch (error) {
+                showError(`Tải dữ liệu QC thất bại: ${error.message}`);
+            } finally {
+                setLoadingState(false, 'data');
+            }
+        }
+        
+        function applyAdsFiltersAndSorting() {
+            let filtered = [...allAdsData];
+            if (campaignFilter.value && campaignFilter.value !== 'all') filtered = filtered.filter(d => d.campaign === campaignFilter.value);
+            if (searchInput.value) filtered = filtered.filter(d => d.campaign.toLowerCase().includes(searchInput.value.toLowerCase()));
+            if (minSpendFilter.value) filtered = filtered.filter(d => d.spend >= parseFloat(minSpendFilter.value));
+            if (maxSpendFilter.value) filtered = filtered.filter(d => d.spend <= parseFloat(maxSpendFilter.value));
+            
+            filtered.sort((a, b) => {
+                const aVal = a[adsSortConfig.key]; const bVal = b[adsSortConfig.key];
+                const comparison = aVal > bVal ? 1 : (aVal < bVal ? -1 : 0);
+                return adsSortConfig.direction === 'descending' ? comparison * -1 : comparison;
+            });
+
+            displayedAdsData = filtered;
+            updateDashboardUI(displayedAdsData);
+        }
+        
+        function updateDashboardUI(data) {
+            updateKPIs(data);
+            updatePerformanceChart(data);
+            updateCampaignSpendChart(data);
+            updateAdsDataTable(data);
+            updateSortIcons('ads');
+        }
+
+        function updateAdsDataTable(data) {
+            adsDataTableBody.innerHTML = '';
+            if (data.length === 0) {
+                adsDataTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4">Không có dữ liệu.</td></tr>`;
+                return;
+            }
+            const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'decimal', maximumFractionDigits: 2 });
+            data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 text-sm font-medium text-slate-900">${item.campaign}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${currencyFormatter.format(item.spend)}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${item.impressions.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${item.clicks.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${currencyFormatter.format(item.cpc)}</td>
+                    <td class="px-6 py-4 text-sm font-medium space-x-2">
+                        <button class="edit-btn text-indigo-600 hover:text-indigo-900" data-type="ads">Sửa</button>
+                        <button class="delete-btn text-red-600 hover:text-red-900" data-type="ads">Xóa</button>
+                    </td>`;
+                row.querySelector('.edit-btn').addEventListener('click', () => openModal('ads', item));
+                row.querySelector('.delete-btn').addEventListener('click', () => handleDeleteClick('ads', item));
+                adsDataTableBody.appendChild(row);
+            });
+        }
+
+        // --- USERS MODULE ---
+        async function loadUsersFromWebhook() {
+            if (isProcessing) return;
+            setLoadingState(true, 'users');
+            hideError();
+            
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: 'task: getusers' })
+                });
+                if (!response.ok) throw new Error(`Lỗi mạng: ${response.statusText}`);
+                const result = await response.json();
+                
+                let dataArray;
+                try {
+                    dataArray = JSON.parse(result[0]?.output || result.output);
+                } catch(e) {
+                    dataArray = result[0]?.output || result.output;
+                }
+
+                if (!Array.isArray(dataArray)) throw new Error("Webhook không trả về dữ liệu người dùng.");
+
+                allUsersData = dataArray.map((item, index) => ({
+                    row_number: index + 2,
+                    ...item
+                }));
+                applyUsersFiltersAndSorting();
+            } catch (error) {
+                showError(`Tải dữ liệu người dùng thất bại: ${error.message}`);
+            } finally {
+                setLoadingState(false, 'users');
+            }
+        }
+
+        function applyUsersFiltersAndSorting() {
+            let filtered = [...allUsersData];
+            const searchTerm = userSearchInput.value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(u => 
+                    (u.Name && u.Name.toLowerCase().includes(searchTerm)) || 
+                    (u.Email && u.Email.toLowerCase().includes(searchTerm))
+                );
+            }
+            
+            filtered.sort((a, b) => {
+                const aVal = a[usersSortConfig.key]; const bVal = b[usersSortConfig.key];
+                const comparison = String(aVal).localeCompare(String(bVal));
+                return usersSortConfig.direction === 'descending' ? comparison * -1 : comparison;
+            });
+
+            displayedUsersData = filtered;
+            updateUsersDataTable(displayedUsersData);
+        }
+
+        function updateUsersDataTable(data) {
+            usersDataTableBody.innerHTML = '';
+            if (data.length === 0) {
+                usersDataTableBody.innerHTML = `<tr><td colspan="4" class="text-center py-4">Không có dữ liệu.</td></tr>`;
+                return;
+            }
+            data.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 text-sm font-medium text-slate-900">${user.Name}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${user.Email}</td>
+                    <td class="px-6 py-4 text-sm text-slate-500">${user.Role}</td>
+                    <td class="px-6 py-4 text-sm font-medium space-x-2">
+                        <button class="edit-btn text-indigo-600 hover:text-indigo-900" data-type="users">Sửa</button>
+                        <button class="delete-btn text-red-600 hover:text-red-900" data-type="users">Xóa</button>
+                    </td>`;
+                row.querySelector('.edit-btn').addEventListener('click', () => openModal('users', user));
+                row.querySelector('.delete-btn').addEventListener('click', () => handleDeleteClick('users', user));
+                usersDataTableBody.appendChild(row);
+            });
+            updateSortIcons('users');
+        }
+
+        // --- CHAT LOGS MODULE ---
+        async function loadChatLogsFromWebhook() {
+            if (isProcessing || !currentUser) return;
+            setLoadingState(true, 'chat-logs');
+            hideError();
+            
+            try {
+                const response = await fetch('/api/chat-logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (!response.ok) throw new Error(`Lỗi mạng khi tải logs: ${response.statusText}`);
+                
+                const result = await response.json();
+                const dataArray = result.map(item => item.json);
+
+                if (!Array.isArray(dataArray)) throw new Error("Webhook không trả về dữ liệu logs.");
+
+                allChatLogsData = dataArray;
+                applyChatLogsFiltersAndSorting();
+            } catch (error) {
+                showError(`Tải lịch sử chat thất bại: ${error.message}`);
+            } finally {
+                setLoadingState(false, 'chat-logs');
+            }
+        }
+
+        function applyChatLogsFiltersAndSorting() {
+            const cleanedData = allChatLogsData.map(log => {
+                const cleanedLog = {};
+                for (const key in log) {
+                    cleanedLog[key.trim()] = log[key];
+                }
+                return cleanedLog;
+            });
+
+            const conversations = cleanedData.reduce((acc, log) => {
+                if (!log.threadid) return acc;
+                const threadId = log.threadid.trim();
+                if (!acc[threadId]) {
+                    acc[threadId] = { threadid: threadId, email: log.email, messages: [], firstMessage: log.message, timestamp: log.timestamp };
+                }
+                acc[threadId].messages.push(log);
+                if (new Date(log.timestamp) > new Date(acc[threadId].timestamp)) {
+                    acc[threadId].timestamp = log.timestamp;
+                }
+                return acc;
+            }, {});
+
+            let filtered = Object.values(conversations);
+            // Admin sees all, user sees their own
+            if (currentUser.Role.toLowerCase() !== 'admin') {
+                filtered = filtered.filter(c => c.email && c.email.trim() === currentUser.Email);
+            }
+
+            const searchTerm = chatLogsSearchInput.value.toLowerCase();
+            if (searchTerm) {
+                filtered = filtered.filter(c => 
+                    c.messages.some(m => m.message && m.message.toLowerCase().includes(searchTerm)) ||
+                    (c.email && c.email.toLowerCase().includes(searchTerm)) ||
+                    c.threadid.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            updateChatLogsList(filtered);
+        }
+        
+        function updateChatLogsList(conversations) {
+            chatLogsContainer.innerHTML = '';
+            if (conversations.length === 0) {
+                chatLogsContainer.innerHTML = `<p class="text-center text-slate-500 py-4">Không có lịch sử trò chuyện.</p>`;
+                return;
+            }
+            conversations.forEach(convo => {
+                const convoElement = document.createElement('div');
+                convoElement.className = 'p-4 border rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer';
+                const emailDisplay = currentUser.Role.toLowerCase() === 'admin' ? `<span class="font-semibold text-indigo-700">${convo.email}</span> - ` : '';
+                convoElement.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-slate-800 truncate">${convo.firstMessage}</p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                ${emailDisplay}
+                                <span class="font-mono">${convo.threadid.substring(0,8)}</span> - 
+                                <span>${new Date(convo.timestamp).toLocaleString('vi-VN')}</span>
+                            </p>
+                        </div>
+                        <button class="continue-chat-btn text-sm bg-indigo-600 text-white font-semibold px-3 py-1 rounded-md hover:bg-indigo-700">Tiếp tục</button>
+                    </div>`;
+                convoElement.querySelector('.continue-chat-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    continueConversation(convo.threadid);
+                });
+                chatLogsContainer.appendChild(convoElement);
+            });
+        }
+
+        function continueConversation(threadId) {
+            const cleanedData = allChatLogsData.map(log => {
+                const cleanedLog = {};
+                for (const key in log) { cleanedLog[key.trim()] = log[key]; }
+                return cleanedLog;
+            });
+
+            const messages = cleanedData
+                .filter(log => log.threadid && log.threadid.trim() === threadId)
+                .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            
+            activeThreadId = threadId;
+            updateThreadIdDisplay();
+            
+            chatMessages.innerHTML = '';
+            messages.forEach(msg => appendChatMessage(msg.message, msg.role));
+            switchView('chatbot');
+        }
+
+        // --- MODAL & CRUD ---
+        function openModal(mode, item = null) {
+            itemToEdit = item;
+            const isEditing = item !== null;
+            const modalFieldsContainer = document.getElementById('modal-fields-container');
+            modalFieldsContainer.innerHTML = '';
+            
+            // For now, only Ads and Users have full CRUD. Others are placeholders.
+            if (mode === 'ads') {
+                modalTitle.textContent = isEditing ? 'Chỉnh sửa Bản ghi QC' : 'Thêm Bản ghi QC';
+                document.getElementById('originalIdentifier').value = isEditing ? item.campaign : '';
+                modalFieldsContainer.innerHTML = `
+                    <div><label class="block text-sm font-medium">Tên Nhóm quảng cáo</label><input type="text" name="Ad Set Name" required class="mt-1 block w-full p-2 border rounded" value="${item?.campaign || ''}"></div>
+                    <div><label class="block text-sm font-medium">Số tiền đã chi tiêu</label><input type="number" step="0.01" name="Amount Spent" required class="mt-1 block w-full p-2 border rounded" value="${item?.spend || ''}"></div>
+                    <div><label class="block text-sm font-medium">Lượt hiển thị</label><input type="number" name="Impressions" required class="mt-1 block w-full p-2 border rounded" value="${item?.impressions || ''}"></div>
+                    <div><label class="block text-sm font-medium">Lượt nhấp</label><input type="number" name="Link Clicks" required class="mt-1 block w-full p-2 border rounded" value="${item?.clicks || ''}"></div>
+                    <div><label class="block text-sm font-medium">CPC</label><input type="number" step="0.01" name="CPC (Cost per Link Click)" required class="mt-1 block w-full p-2 border rounded" value="${item?.cpc || ''}"></div>
+                `;
+            } else if (mode === 'users') {
+                modalTitle.textContent = isEditing ? 'Chỉnh sửa Người dùng' : 'Thêm Người dùng';
+                document.getElementById('originalIdentifier').value = isEditing ? item.Email : '';
+                modalFieldsContainer.innerHTML = `
+                    <div><label class="block text-sm font-medium">Tên</label><input type="text" name="Name" required class="mt-1 block w-full p-2 border rounded" value="${item?.Name || ''}"></div>
+                    <div><label class="block text-sm font-medium">Email</label><input type="email" name="Email" required class="mt-1 block w-full p-2 border rounded" value="${item?.Email || ''}" ${isEditing ? 'readonly' : ''}></div>
+                    <div><label class="block text-sm font-medium">Mật khẩu ${isEditing ? '(Để trống nếu không đổi)' : ''}</label><input type="password" name="Password" ${!isEditing ? 'required' : ''} class="mt-1 block w-full p-2 border rounded"></div>
+                    <div><label class="block text-sm font-medium">Vai trò</label>
+                        <select name="Role" required class="mt-1 block w-full p-2 border rounded">
+                            <option value="User" ${item?.Role === 'User' ? 'selected' : ''}>User</option>
+                            <option value="Admin" ${item?.Role === 'Admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </div>
+                `;
+            } else {
+                // Placeholder for other DBs
+                modalTitle.textContent = 'Thêm/Sửa Bản ghi';
+                modalFieldsContainer.innerHTML = `<p>Chức năng tạo/sửa cho mục này đang được phát triển.</p>`;
+            }
+            
+            recordModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalOverlay.classList.remove('opacity-0');
+                modalContainer.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function hideModal() {
+            modalOverlay.classList.add('opacity-0');
+            modalContainer.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                recordModal.classList.add('hidden');
+                recordForm.reset();
+                itemToEdit = null;
+            }, 300);
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            setLoadingState(true, 'form');
+            const formData = new FormData(recordForm);
+            const data = Object.fromEntries(formData.entries());
+            if (itemToEdit && data.Password === '') delete data.Password;
+
+            let webhookUrl, prompt, mode;
+            const activeViewId = document.querySelector('.view-container.active').id;
+
+            if (activeViewId.includes('ads')) {
+                mode = 'ads';
+            } else if (activeViewId.includes('profiles')) {
+                mode = 'users';
+            }
+            
+            if (mode === 'ads') {
+                webhookUrl = '/api/manipulate-ads';
+                const task = itemToEdit ? 'edit1' : 'addrecord1';
+                prompt = itemToEdit 
+                    ? `task: ${task} - matchOn: {"Ad Set Name": "${document.getElementById('originalIdentifier').value}"} - data: ${JSON.stringify(data)}`
+                    : `task: ${task} - ${JSON.stringify(data)}`;
+            } else if (mode === 'users') {
+                webhookUrl = '/api/users';
+                const task = itemToEdit ? 'edituser' : 'adduser';
+                prompt = itemToEdit
+                    ? `task: ${task} - matchOn: {"Email": "${document.getElementById('originalIdentifier').value}"} - data: ${JSON.stringify(data)}`
+                    : `task: ${task} - data: ${JSON.stringify(data)}`;
+            } else {
+                showError("Chức năng chưa được hỗ trợ cho mục này.");
+                setLoadingState(false, 'form');
+                return;
+            }
+            
+            try {
+                const response = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+                if (!response.ok) throw new Error(`Lỗi Webhook: ${response.statusText}`);
+                await new Promise(res => setTimeout(res, 1500));
+                if (mode === 'ads') await loadAdsFromWebhook(); else await loadUsersFromWebhook();
+                hideModal();
+                showConfirmationPopup();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setLoadingState(false, 'form');
+            }
+        }
+
+        function handleDeleteClick(mode, item) {
+            itemToDelete = { mode, item };
+            deleteConfirmModal.classList.remove('hidden');
+        }
+        
+        function hideDeleteModal() {
+            itemToDelete = null;
+            deleteConfirmModal.classList.add('hidden');
+        }
+
+        async function processDelete() {
+            if (!itemToDelete) return;
+            const { mode, item } = itemToDelete;
+            
+            let webhookUrl, prompt;
+            if (mode === 'ads') {
+                webhookUrl = '/api/manipulate-ads';
+                prompt = `task: delete1 - row_number: ${item.row_number}`;
+            } else if (mode === 'users') {
+                webhookUrl = '/api/users';
+                prompt = `task: deleteuser - row_number: ${item.row_number}`;
+            } else {
+                 showError("Chức năng xóa chưa được hỗ trợ cho mục này.");
+                 hideDeleteModal();
+                 return;
+            }
+
+            try {
+                const response = await fetch(webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt }) });
+                if (!response.ok) throw new Error(`Lỗi khi xóa: ${response.statusText}`);
+                await new Promise(res => setTimeout(res, 1500));
+                if (mode === 'ads') await loadAdsFromWebhook(); else await loadUsersFromWebhook();
+                showConfirmationPopup();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                hideDeleteModal();
+            }
+        }
+
+        // --- AI INTEGRATION ---
+        function createAiAnalysisHtml(viewId) {
+            return `
+                <div class="ai-analysis-container mb-6 bg-white p-6 rounded-lg shadow-sm border border-indigo-100">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-slate-800">AI Phân tích & Đề xuất</h2>
+                        <button class="ai-refresh-btn bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-2 disabled:bg-indigo-400" data-view-id="${viewId}">
+                            <i class="ai-icon fa-solid fa-wand-magic-sparkles"></i>
+                            <div class="ai-loader loader w-5 h-5 rounded-full border-2 border-slate-200 hidden"></div>
+                            Phân tích AI
+                        </button>
+                    </div>
+                    <div class="ai-summary text-slate-700 prose prose-sm max-w-none mt-4">
+                        <p>Nhấn nút "Phân tích AI" để nhận đề xuất chi tiết cho dữ liệu trên trang này.</p>
+                    </div>
+                </div>`;
+        }
+
+        function injectAiSections() {
+            document.querySelectorAll('.view-container').forEach(view => {
+                // Don't add to chatbot view
+                if(view.id === 'view-chatbot') return;
+                const viewId = view.id.replace('view-', '');
+                const aiSectionHtml = createAiAnalysisHtml(viewId);
+                view.insertAdjacentHTML('afterbegin', aiSectionHtml);
+            });
+        }
+        
+        function handleMainContentClick(e) {
+            const aiButton = e.target.closest('.ai-refresh-btn');
+            const addDbButton = e.target.closest('.db-add-record-btn');
+
+            if (aiButton) {
+                handleAiRefresh(aiButton);
+            }
+            if (addDbButton) {
+                const dbType = addDbButton.dataset.dbType;
+                openModal(dbType.replace('-db', ''));
+            }
+        }
+
+        async function handleAiRefresh(button) {
+             if (isProcessing) return;
+             const viewId = button.dataset.viewId;
+             const container = button.closest('.ai-analysis-container');
+             const summaryDiv = container.querySelector('.ai-summary');
+             const loader = container.querySelector('.ai-loader');
+             const icon = container.querySelector('.ai-icon');
+
+             button.disabled = true;
+             loader.classList.remove('hidden');
+             icon.classList.add('hidden');
+             summaryDiv.innerHTML = `<div class="flex items-center"><div class="ai-loader w-5 h-5 rounded-full border-2 mr-3 border-t-indigo-500"></div><span>AI đang phân tích...</span></div>`;
+
+             const { data, prompt } = getDataAndPromptForView(viewId);
+
+             if (!data || data.length === 0) {
+                 summaryDiv.innerHTML = `<p class="text-orange-600"><strong>Lưu ý:</strong> Không có dữ liệu để phân tích trên trang này.</p>`;
+                 button.disabled = false;
+                 loader.classList.add('hidden');
+                 icon.classList.remove('hidden');
+                 return;
+             }
+
+             try {
+                 const response = await callGeminiApi(prompt);
+                 summaryDiv.innerHTML = marked.parse(response);
+             } catch (error) {
+                 summaryDiv.innerHTML = `<p class="text-red-600"><strong>Lỗi:</strong> ${error.message}</p>`;
+             } finally {
+                 button.disabled = false;
+                 loader.classList.add('hidden');
+                 icon.classList.remove('hidden');
+             }
+        }
+        
+        function getDataAndPromptForView(viewId) {
+            let data;
+            let prompt;
+            const dataSnippet = (d) => JSON.stringify(d.slice(0, 20));
+
+            switch(viewId) {
+                case 'ads-db':
+                    data = displayedAdsData;
+                    prompt = `Assume you are a marketing analyst. Based on this ad data, provide a concise summary and 3 actionable recommendations to optimize performance. Data: ${dataSnippet(data)}. Present the answer in Vietnamese using Markdown.`;
+                    break;
+                case 'profiles':
+                    data = displayedUsersData;
+                    prompt = `Assume you are an HR manager. Based on this user list, provide a summary of the team structure and suggest one team-building activity. Data: ${dataSnippet(data)}. Present the answer in Vietnamese using Markdown.`;
+                    break;
+                case 'tasklist':
+                    data = [{id: 1, title: "Deepresearch outline for PR"}, {id: 2, title: "Tối ưu ads campain X"}]; // Mock data
+                    prompt = `Assume you are a project manager. Based on this task list, identify potential bottlenecks and suggest a priority. Data: ${dataSnippet(data)}. Present the answer in Vietnamese using Markdown.`;
+                    break;
+                case 'hr-db':
+                     data = [{name: 'Lê Thị Duyên', position: 'Marketing Executive'}, {name: 'Phạm Văn Em', position: 'Sales Manager'}]; // Mock data
+                     prompt = `Assume you are a recruitment specialist. Analyze this applicant data and suggest the next step for each. Data: ${dataSnippet(data)}. Present the answer in Vietnamese using Markdown.`;
+                     break;
+                default:
+                    data = [];
+                    prompt = '';
+            }
+            return { data, prompt };
+        }
+
+        // --- UTILITIES & HELPERS ---
+        function setLoadingState(isLoading, type, element = null) {
+            isProcessing = isLoading;
+            const elements = {
+                auth: { btn: authSubmitBtn, loader: authLoader },
+                data: { btn: refreshDataBtn, loader: dataLoader, icon: refreshDataIcon },
+                users: { btn: refreshUsersBtn, loader: document.getElementById('usersLoader'), icon: document.getElementById('refreshUsersIcon') },
+                'chat-logs': { btn: refreshChatLogsBtn, loader: document.getElementById('chatLogsLoader'), icon: document.getElementById('refreshChatLogsIcon') },
+                form: { btn: submitFormBtn, loader: formLoader },
+            };
+            const el = elements[type];
+            if (el) {
+                el.btn.disabled = isLoading;
+                el.loader.classList.toggle('hidden', !isLoading);
+                if(el.icon) el.icon.classList.toggle('hidden', isLoading);
+            }
+        }
+        function showError(msg) { errorMessage.textContent = `Lỗi: ${msg}`; errorMessage.classList.remove('hidden'); }
+        function hideError() { errorMessage.classList.add('hidden'); }
+        function showConfirmationPopup() {
+            confirmationPopup.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => confirmationPopup.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+        function updateSortIcons(type) {
+            const config = type === 'ads' ? adsSortConfig : usersSortConfig;
+            const selector = type === 'ads' ? '.sortable-header' : '.user-sortable-header';
+            document.querySelectorAll(selector).forEach(header => {
+                const icon = header.querySelector('.sort-icon');
+                const key = header.dataset.sortKey;
+                if (key === config.key) {
+                    header.classList.add('sorted');
+                    icon.innerHTML = config.direction === 'ascending' ? '▲' : '▼';
+                } else {
+                    header.classList.remove('sorted');
+                    icon.innerHTML = '';
+                }
+            });
+        }
+        function populateCampaignFilter() {
+            const campaigns = [...new Set(allAdsData.map(d => d.campaign))];
+            campaignFilter.innerHTML = '<option value="all">Tất cả Nhóm QC</option>';
+            campaigns.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c; option.textContent = c;
+                campaignFilter.appendChild(option);
+            });
+        }
+        
+        function initializeOriginalCharts() {
+            const defaultOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#e2e8f0' } } } };
+            const perfCtx = document.getElementById('performanceChart')?.getContext('2d');
+            const spendCtx = document.getElementById('campaignSpendChart')?.getContext('2d');
+            if(perfCtx) charts.performance = new Chart(perfCtx, { type: 'bar', data: { labels: [], datasets: [] }, options: { ...defaultOptions, interaction: { mode: 'index', intersect: false }, scales: { x: { stacked: true }, y1: { type: 'linear', position: 'left', title: { display: true, text: 'Chi tiêu' }, stacked: true }, y2: { type: 'linear', position: 'right', title: { display: true, text: 'Lượt hiển thị' }, grid: { drawOnChartArea: false } } } } });
+            if(spendCtx) charts.campaignSpend = new Chart(spendCtx, { type: 'doughnut', data: { labels: [], datasets: [] }, options: { ...defaultOptions, scales: {} } });
+        }
+        
+        function updateKPIs(data) {
+            const totals = data.reduce((acc, item) => { acc.spend += item.spend; acc.impressions += item.impressions; acc.clicks += item.clicks; return acc; }, { spend: 0, impressions: 0, clicks: 0 });
+            const avgCpc = totals.clicks > 0 ? totals.spend / totals.clicks : 0;
+            kpiSpend.textContent = totals.spend.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            kpiImpressions.textContent = totals.impressions.toLocaleString();
+            kpiCpc.textContent = avgCpc.toLocaleString('en-US', { maximumFractionDigits: 2 });
+            kpiClicks.textContent = totals.clicks.toLocaleString();
+        }
+        
+        function updatePerformanceChart(data) {
+            if(!charts.performance) return;
+            const performanceByCampaign = data.reduce((acc, item) => { if (!acc[item.campaign]) acc[item.campaign] = { spend: 0, impressions: 0 }; acc[item.campaign].spend += item.spend; acc[item.campaign].impressions += item.impressions; return acc; }, {});
+            const labels = Object.keys(performanceByCampaign);
+            charts.performance.data.labels = labels;
+            charts.performance.data.datasets = [ { label: 'Chi tiêu', data: labels.map(l => performanceByCampaign[l].spend), backgroundColor: '#3b82f6', yAxisID: 'y1' }, { label: 'Lượt hiển thị', data: labels.map(l => performanceByCampaign[l].impressions), backgroundColor: '#16a34a', yAxisID: 'y2', type: 'line', tension: 0.2 } ];
+            charts.performance.update();
+        }
+        
+        function updateCampaignSpendChart(data) {
+            if(!charts.campaignSpend) return;
+            const spendByCampaign = data.reduce((acc, item) => { if (!acc[item.campaign]) acc[item.campaign] = 0; acc[item.campaign] += item.spend; return acc; }, {});
+            charts.campaignSpend.data.labels = Object.keys(spendByCampaign);
+            charts.campaignSpend.data.datasets = [{ label: 'Chi tiêu', data: Object.values(spendByCampaign), backgroundColor: ['#3b82f6', '#ef4444', '#f97316', '#eab308', '#84cc16', '#22c55e', '#10b101', '#06b6d4', '#8b5cf6', '#d946ef'] }];
+            charts.campaignSpend.update();
+        }
+        
+        function startNewChat() {
+            activeThreadId = crypto.randomUUID();
+            updateThreadIdDisplay();
+            chatMessages.innerHTML = '<div class="flex justify-start"><div class="chat-bubble-ai p-3 rounded-lg max-w-lg">Bắt đầu cuộc trò chuyện mới. Tôi có thể giúp gì cho bạn?</div></div>';
+        }
+
+        function updateThreadIdDisplay() {
+            threadIdDisplay.textContent = activeThreadId.substring(0, 8);
+        }
+
+        async function handleChatSubmit() {
+            const userInput = chatInput.value.trim();
+            if (!userInput || isProcessing || !currentUser) return;
+            
+            appendChatMessage(userInput, 'user'); 
+            chatInput.value = '';
+
+            const payload = { prompt: userInput, email: currentUser.Email, threadid: activeThreadId };
+
+            try {
+                const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`Lỗi webhook: ${response.statusText}`);
+                const result = await response.json();
+                const aiResponse = Array.isArray(result) && result[0]?.output ? result[0].output : (result.output || `Lỗi định dạng phản hồi.`);
+                appendChatMessage(aiResponse, 'ai');
+            } catch (error) {
+                appendChatMessage(`Lỗi: ${error.message}`, 'ai');
+            }
+        }
+        
+        function appendChatMessage(message, sender) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            const bubble = document.createElement('div');
+            bubble.className = `p-3 rounded-lg max-w-none ${sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}`;
+            // Use marked.parse to render markdown content
+            bubble.innerHTML = marked.parse(message);
+            wrapper.appendChild(bubble);
+            chatMessages.appendChild(wrapper);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        async function callGeminiApi(prompt) {
+            const apiUrl = '/api/gemini';
+            const payload = { contents: [{ parts: [{ text: prompt }] }] };
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`Yêu cầu AI thất bại (${response.status}).`);
+            const result = await response.json();
+            const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text; else throw new Error("Không nhận được phản hồi hợp lệ từ AI.");
+        }
+
+    </script>
+</body>
+</html>
